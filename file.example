@@ -1,3 +1,5 @@
-##!!hello
+##!!hello - this should fail
 
-This is an example-file. Only the first line should be matched!
+This is an example-file. Only the first and last line should be matched!
+
+##!!./src/
