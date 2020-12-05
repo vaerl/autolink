@@ -2,7 +2,10 @@
 name = "autolink"
 version = "0.1.0"
 authors = ["vaerl <lukas@mlel.dev>"]
+license = "MIT OR Apache-2.0"
 edition = "2018"
+readme = "README.md"
+description = "A tool automatically symlink files"
 
 [dependencies]
 structopt = "0.3.20"
