@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use log::{debug, error, info, warn};
-use std::fs;
-use std::os::unix::fs::symlink;
 use std::path::PathBuf;
+use std::{fs, io::BufRead, io::BufReader};
+use std::{fs::File, os::unix::fs::symlink};
 use structopt::StructOpt;
 
 // using structopt auto-generates CLI-information
@@ -16,6 +16,7 @@ struct Arg {
 // TODO check return-types
 // TODO handle multiple links?
 // TODO save created symlinks for deletion
+// TODO create binary -> gh-actions?
 fn main() -> Result<()> {
     env_logger::init();
     info!("Starting.");
@@ -48,14 +49,10 @@ fn link(origin: PathBuf) -> Result<()> {
 }
 
 fn link_file(mut origin: PathBuf) -> Result<()> {
-    // open file from path
-    let content: String = std::fs::read_to_string(&origin)
-        .with_context(|| format!("Could not read file `{}`", &origin.display()))?;
-
-    for line in content.lines() {
-        // TODO use starts_with?
-        if line.contains("##!!") {
-            // TODO optimize -> use bufReader?
+    let file = File::open(&origin)?;
+    for line in BufReader::new(file).lines() {
+        let line = line?;
+        if line.starts_with("##!!") {
             debug!("Recognized tag: {}", line);
 
             // cut indicator from line, convert to path
@@ -81,7 +78,7 @@ fn link_file(mut origin: PathBuf) -> Result<()> {
 
             // symlink from the given path to destination
             match symlink(&origin, destination) {
-                Ok(res) => info!("Result: {:?}", res),
+                Ok(res) => debug!("Result: {:?}", res),
                 Err(err) => error!("Symlink-Error: {}", err),
             }
         }
