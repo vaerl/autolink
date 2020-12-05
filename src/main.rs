@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use std::fs;
+use std::os::unix::fs::symlink;
 use std::path::PathBuf;
-use std::process::Command;
 use structopt::StructOpt;
 
 // using structopt auto-generates CLI-information
@@ -14,6 +14,8 @@ struct Arg {
 
 // TODO eliminate unwrap if possible
 // TODO check return-types
+// TODO handle multiple links?
+// TODO save created symlinks for deletion
 fn main() -> Result<()> {
     env_logger::init();
     info!("Starting.");
@@ -37,23 +39,31 @@ fn link(origin: PathBuf) -> Result<()> {
         }
         return Ok(());
     } else {
+        warn!(
+            "Path {} is neither file nor directory, skipping.",
+            origin.display()
+        );
         Ok(())
     }
 }
 
-fn link_file(origin: PathBuf) -> Result<()> {
+fn link_file(mut origin: PathBuf) -> Result<()> {
     // open file from path
     let content: String = std::fs::read_to_string(&origin)
         .with_context(|| format!("Could not read file `{}`", &origin.display()))?;
 
     for line in content.lines() {
+        // TODO use starts_with?
         if line.contains("##!!") {
             // TODO optimize -> use bufReader?
             debug!("Recognized tag: {}", line);
 
             // cut indicator from line, convert to path
             let substr: String = line.chars().into_iter().skip(4).collect();
-            let destination: PathBuf = PathBuf::from(substr);
+            debug!("Extracted substring: {}", substr);
+
+            // check if specified destination exists
+            let mut destination: PathBuf = PathBuf::from(substr);
             if !destination.exists() {
                 warn!(
                     "Destination {} does not exist, skipping.",
@@ -62,33 +72,19 @@ fn link_file(origin: PathBuf) -> Result<()> {
                 continue;
             }
 
-            let mut full_origin: PathBuf = PathBuf::from(&destination);
-            full_origin.push(origin.file_name().unwrap());
-            if link_exists(full_origin) {
-                warn!("Link exists at {}, skipping.", destination.display());
-                continue;
-            }
+            // get absolute path for destination and origin
+            destination = destination.canonicalize()?;
+            destination.push(&origin.file_name().unwrap());
+            origin = origin.canonicalize()?;
+            debug!("Origin: {}", &origin.display());
+            debug!("Destination: {}", destination.display());
 
             // symlink from the given path to destination
-            // TODO convert to complete paths
-            Command::new("ln")
-                .arg("-s")
-                .arg(&origin.canonicalize().unwrap())
-                .arg(destination.canonicalize().unwrap())
-                .spawn()
-                .expect("Could not symlink.");
+            match symlink(&origin, destination) {
+                Ok(res) => info!("Result: {:?}", res),
+                Err(err) => error!("Symlink-Error: {}", err),
+            }
         }
     }
     Ok(())
-}
-
-fn link_exists(path: PathBuf) -> bool {
-    info!("Testing if symlink {} exists.", path.display());
-    match Command::new("test").arg("-f").arg(&path).output() {
-        Ok(output) => output.status.success(),
-        Err(err) => {
-            debug!("Something went wrong, returning false: {}", err);
-            false
-        }
-    }
 }
