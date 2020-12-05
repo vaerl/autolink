@@ -2,6 +2,7 @@ use anyhow::Result;
 use log::{debug, error, info, warn};
 use std::path::PathBuf;
 use std::{fs, io::BufRead, io::BufReader};
+// NOTE why is this import not recognized?
 use std::{fs::File, os::unix::fs::symlink};
 use structopt::StructOpt;
 
@@ -13,13 +14,11 @@ struct Arg {
     #[structopt(parse(from_os_str))]
     path: PathBuf,
 }
-// TODO save created symlinks for deletion
-// TODO create binary -> gh-actions?
-// TODO test?
 fn main() -> Result<()> {
     env_logger::init();
     info!("Starting.");
 
+    // NOTE using a struct-opt might prove beneficial later ¯\_(ツ)_/¯
     let arg = Arg::from_args();
     link(arg.path)
 }
@@ -35,6 +34,7 @@ fn link(origin: PathBuf) -> Result<()> {
         );
         let paths = fs::read_dir(origin)?;
         for path in paths {
+            // NOTE is not using this okay - do I even need to return anything?
             link(path?.path());
         }
         Ok(())
@@ -70,12 +70,14 @@ fn link_file(mut origin: PathBuf) -> Result<()> {
 
             // get absolute path for destination and origin
             destination = destination.canonicalize()?;
+            // NOTE is this unwrap okay?
             destination.push(&origin.file_name().unwrap());
             origin = origin.canonicalize()?;
             debug!("Origin: {}", &origin.display());
             debug!("Destination: {}", destination.display());
 
             // symlink from the given path to destination
+            // NOTE is matching necessary here?
             match symlink(&origin, destination) {
                 Ok(res) => debug!("Result: {:?}", res),
                 Err(err) => error!("Symlink-Error: {}", err),
