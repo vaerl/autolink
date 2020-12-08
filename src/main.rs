@@ -1,8 +1,8 @@
 use anyhow::Result;
 use log::{debug, error, info, warn};
+use regex::Regex;
 use std::path::PathBuf;
 use std::{fs, io::BufRead, io::BufReader};
-// NOTE why is this import not recognized?
 use std::{fs::File, os::unix::fs::symlink};
 use structopt::StructOpt;
 
@@ -34,8 +34,7 @@ fn link(origin: PathBuf) -> Result<()> {
         );
         let paths = fs::read_dir(origin)?;
         for path in paths {
-            // NOTE is not using this okay - do I even need to return anything?
-            link(path?.path());
+            link(path?.path())?;
         }
         Ok(())
     } else {
@@ -51,15 +50,14 @@ fn link_file(mut origin: PathBuf) -> Result<()> {
     let file = File::open(&origin)?;
     for line in BufReader::new(file).lines() {
         let line = line?;
-        if line.contains("##!!") {
-            debug!("Recognized tag: {}", line);
 
-            // cut indicator from line, convert to path
-            let substr: String = line.chars().into_iter().skip(4).collect();
-            debug!("Extracted substring: {}", substr);
+        let re = Regex::new(r"##!!([^\\B]+)\b").unwrap();
+
+        for cap in re.captures_iter(&line) {
+            debug!("Matched: {}, extracted substring: {}", &cap[0], &cap[1]);
 
             // check if specified destination exists
-            let mut destination: PathBuf = PathBuf::from(substr);
+            let mut destination: PathBuf = PathBuf::from(&cap[1]);
             if !destination.exists() {
                 warn!(
                     "Destination {} does not exist, skipping.",
@@ -70,14 +68,12 @@ fn link_file(mut origin: PathBuf) -> Result<()> {
 
             // get absolute path for destination and origin
             destination = destination.canonicalize()?;
-            // NOTE is this unwrap okay?
             destination.push(&origin.file_name().unwrap());
             origin = origin.canonicalize()?;
             debug!("Origin: {}", &origin.display());
             debug!("Destination: {}", destination.display());
 
             // symlink from the given path to destination
-            // NOTE is matching necessary here?
             match symlink(&origin, destination) {
                 Ok(res) => debug!("Result: {:?}", res),
                 Err(err) => error!("Symlink-Error: {}", err),
