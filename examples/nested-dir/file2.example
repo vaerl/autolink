@@ -2,6 +2,4 @@
 
 This is an example-file. Only the first and last line should be matched!
 
-##!!./src/
-
-##!!~/dev
+##!!../test/nested-dir

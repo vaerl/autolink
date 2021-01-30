@@ -1,5 +1,7 @@
-##!!hello - this should fail
+#!!hello - this should fail
 
 This is an example-file. Only the first and last line should be matched!
 
-##!!./src/
+##!!~
+##!!~/dev
+##!!./test/

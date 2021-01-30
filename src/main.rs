@@ -1,8 +1,10 @@
 use anyhow::Result;
+use env_logger::Builder;
 use link::Link;
 use log::debug;
+use log::LevelFilter;
 use regex::Regex;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 use std::{fs::read_dir, fs::File};
 use std::{io::BufRead, io::BufReader};
 use structopt::StructOpt;
@@ -30,24 +32,25 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    env_logger::init();
-    debug!("Starting operation.");
+    // build from env to respect RUST_LOG
+    let mut builder = Builder::from_default_env();
 
     let args: Args = Args::from_args();
 
     if args.verbose {
         println!("Setting the rust-debug-level to DEBUG.");
-        // FIXME this does nothing
-        std::env::set_var("RUST_LOG", "debug");
+        builder.filter_level(LevelFilter::Debug);
     }
+    builder.init();
+    debug!("Starting operation.");
 
-    println!("Extracting links from path {}.", args.path.display());
-    let links = find_links(&args.path)?;
+    println!("Extracting links from '{}'.", args.path.display());
+    let links = find_links(&args.path, args.create_dirs)?;
     println!("Finished extracting links.");
 
     if args.delete {
         println!(
-            "Deleting all symlinks specified by files in {}.",
+            "Deleting all symlinks specified by files in '{}'.",
             args.path.display()
         );
         for link in links {
@@ -62,19 +65,19 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn find_links(path: &PathBuf) -> Result<Vec<Link>> {
+fn find_links(path: &PathBuf, create_dirs: bool) -> Result<Vec<Link>> {
     let mut result = Vec::<Link>::new();
     if path.is_file() {
-        println!("Path '{}' is file, adding link to list.", path.display());
-        result.push(get_link(path)?)
+        println!("'{}' is file, adding link to list.", path.display());
+        result.push(get_link(path, create_dirs)?)
     } else if path.is_dir() {
         println!(
-            "Path '{}' is directory, finding links recursively.",
+            "'{}' is directory, finding links recursively.",
             path.display()
         );
         let paths = read_dir(path)?;
         for path in paths {
-            result.append(&mut find_links(&path?.path())?);
+            result.append(&mut find_links(&path?.path(), create_dirs)?);
         }
     } else {
         println!(
@@ -85,8 +88,8 @@ fn find_links(path: &PathBuf) -> Result<Vec<Link>> {
     Ok(result)
 }
 
-fn get_link(origin: &PathBuf) -> Result<Link> {
-    let reg = Regex::new(r"##!!([^\\B]+)\b").unwrap();
+fn get_link(origin: &PathBuf, create_dirs: bool) -> Result<Link> {
+    let reg = Regex::new(r"##!!(((~|.|..)?(/.+)+)|~)").unwrap();
     let mut destinations = Vec::<PathBuf>::new();
 
     debug!("Trying to open file '{}'.", origin.display());
@@ -96,9 +99,9 @@ fn get_link(origin: &PathBuf) -> Result<Link> {
 
         for cap in reg.captures_iter(&line) {
             debug!("Matched: '{}', extracted substring: {}", &cap[0], &cap[1]);
+            let matched_str = &cap[1];
 
             // expand tilde
-            let matched_str = &cap[1];
             let path = if matched_str.contains("~") {
                 debug!("Found tilde, replacing.");
                 shellexpand::tilde(&matched_str).to_string()
@@ -106,7 +109,12 @@ fn get_link(origin: &PathBuf) -> Result<Link> {
                 matched_str.to_string()
             };
 
-            match PathBuf::from(&path).canonicalize() {
+            let mut context = origin.parent().unwrap().to_path_buf();
+            context.push(&path);
+            debug!("Expanded path: {}", context.display());
+
+            // NOTE canonicalize() fails when the path doesn't exist
+            match context.canonicalize() {
                 Ok(mut destination) => {
                     destination.push(&origin.file_name().unwrap());
                     debug!("Origin: {}", &origin.display());

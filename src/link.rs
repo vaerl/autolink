@@ -36,8 +36,19 @@ impl Link {
             }
 
             match symlink(&self.origin, destination) {
-                Ok(res) => println!("Symlinking returned: {:?}", res),
-                Err(err) => println!("Symlinking failed with: {}", err),
+                Ok(_res) => println!(
+                    "Symlinked '{}' to '{}'.",
+                    self.origin.display(),
+                    destination.display()
+                ),
+                Err(err) => {
+                    println!(
+                        "Symlinking of '{}' to '{}' failed with: {}",
+                        self.origin.display(),
+                        destination.display(),
+                        err
+                    )
+                }
             }
         }
         Ok(())
