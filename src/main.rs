@@ -4,7 +4,7 @@ use link::Link;
 use log::debug;
 use log::LevelFilter;
 use regex::Regex;
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 use std::{fs::read_dir, fs::File};
 use std::{io::BufRead, io::BufReader};
 use structopt::StructOpt;
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     debug!("Starting operation.");
 
     println!("Extracting links from '{}'.", args.path.display());
-    let links = find_links(&args.path, args.create_dirs)?;
+    let links = find_links(&args.path)?;
     println!("Finished extracting links.");
 
     if args.delete {
@@ -65,11 +65,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn find_links(path: &PathBuf, create_dirs: bool) -> Result<Vec<Link>> {
+fn find_links(path: &PathBuf) -> Result<Vec<Link>> {
     let mut result = Vec::<Link>::new();
     if path.is_file() {
         println!("'{}' is file, adding link to list.", path.display());
-        result.push(get_link(path, create_dirs)?)
+        result.push(get_link(path)?)
     } else if path.is_dir() {
         println!(
             "'{}' is directory, finding links recursively.",
@@ -77,7 +77,7 @@ fn find_links(path: &PathBuf, create_dirs: bool) -> Result<Vec<Link>> {
         );
         let paths = read_dir(path)?;
         for path in paths {
-            result.append(&mut find_links(&path?.path(), create_dirs)?);
+            result.append(&mut find_links(&path?.path())?);
         }
     } else {
         println!(
@@ -88,7 +88,7 @@ fn find_links(path: &PathBuf, create_dirs: bool) -> Result<Vec<Link>> {
     Ok(result)
 }
 
-fn get_link(origin: &PathBuf, create_dirs: bool) -> Result<Link> {
+fn get_link(origin: &PathBuf) -> Result<Link> {
     let reg = Regex::new(r"##!!(((~|.|..)?(/.+)+)|~)").unwrap();
     let mut destinations = Vec::<PathBuf>::new();
 
@@ -113,7 +113,12 @@ fn get_link(origin: &PathBuf, create_dirs: bool) -> Result<Link> {
             context.push(&path);
             debug!("Expanded path: {}", context.display());
 
-            // NOTE canonicalize() fails when the path doesn't exist
+            /* canonicalize() fails when the path doesn't exist.
+             * https://github.com/vitiral/path_abs provides PathAbs which creates an absolute path without failing
+             * when the path doesn't exist. This however uses an old version of serde(1.0.118) and compilation of the
+             * crate fails(seems related to https://github.com/teloxide/teloxide/issues/328).
+             * TODO open an issue/pr?
+             */
             match context.canonicalize() {
                 Ok(mut destination) => {
                     destination.push(&origin.file_name().unwrap());
