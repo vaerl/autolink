@@ -1,0 +1,27 @@
+on: [push]
+
+name: Build Binaries
+
+jobs:
+  build_for_linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+      - name: Build binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Rename binary
+        run: mv target/release/autolink autolink-amd64
+      - name: Release binary
+        id: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with: 
+          files: |
+          target/release/autolink-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
