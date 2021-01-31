@@ -23,8 +23,18 @@ Run `cargo test`(no tests are implemented yet!).
 
 ## Building
 
-Clone the repository, then `cd` into it. Now, run `cargo build --release`.
-The binary is now available under `./target/release`.
+### Locally
+
+Install [Rust](https://www.rust-lang.org/) if you haven't already.
+Then run the build- and install-scripts from [here](./scripts).
+
+### GitHub
+
+On a push to origin with a tag containing the version number, a GitHub-Actions workflow is triggered that builds a linux binary.
+Creating a new release:
+
+Use `git tag vx.x.x` for a minor or `git tag -a vx.x.x -m "message"` for a major release (with notes about the release).
+Then, run `push origin vx.x.x`.
 
 ## Examples
 
