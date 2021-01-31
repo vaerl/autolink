@@ -20,8 +20,8 @@ jobs:
         id: release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
-        with: 
+        with:
           files: |
-          target/release/autolink-amd64
+            /target/release/autolink-amd64
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
