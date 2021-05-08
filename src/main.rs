@@ -13,20 +13,26 @@ mod link;
 mod tests;
 
 // using structopt auto-generates CLI-information
+// NOTE doc-comments are automatically displayed when using -h
 #[derive(StructOpt)]
 struct Args {
     #[structopt(parse(from_os_str))]
     path: PathBuf,
 
-    #[structopt(short = "c", long = "create-dirs")]
+    /// Create folders that do not exist yet
+    #[structopt(short = "c", long = "create")]
     create_dirs: bool,
 
+    // CHECK if this flag provides value
+    /// Delete existing symlinks and add again, effectively overwriting existing links
     #[structopt(short, long)]
     overwrite: bool,
 
+    /// Delete all symlinks specified in the provided folder/file
     #[structopt(short, long)]
     delete: bool,
 
+    /// Show verbose logs
     #[structopt(short, long)]
     verbose: bool,
 }
