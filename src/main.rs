@@ -1,8 +1,7 @@
 use anyhow::Result;
-use env_logger::Builder;
+use human_panic::setup_panic;
 use link::Link;
-use log::debug;
-use log::LevelFilter;
+use path_absolutize::Absolutize;
 use regex::Regex;
 use std::path::PathBuf;
 use std::{fs::read_dir, fs::File};
@@ -15,7 +14,8 @@ mod tests;
 // using structopt auto-generates CLI-information
 // NOTE doc-comments are automatically displayed when using -h
 #[derive(StructOpt)]
-struct Args {
+#[structopt(name = "autolink", about = "Automatically symlink files.")]
+struct Autolink {
     #[structopt(parse(from_os_str))]
     path: PathBuf,
 
@@ -37,108 +37,143 @@ struct Args {
     verbose: bool,
 }
 
-fn main() -> Result<()> {
-    // build from env to respect RUST_LOG
-    let mut builder = Builder::from_default_env();
+impl Autolink {
+    /// Start the specified operation.
+    fn do_op(&self) -> Result<()> {
+        let links = self.find_links(&self.path)?;
+        Autolink::spacer();
 
-    let args: Args = Args::from_args();
-
-    if args.verbose {
-        println!("Setting the rust-debug-level to DEBUG.");
-        builder.filter_level(LevelFilter::Debug);
-    }
-    builder.init();
-    debug!("Starting operation.");
-
-    println!("Extracting links from '{}'.", args.path.display());
-    let links = find_links(&args.path)?;
-    println!("Finished extracting links.");
-
-    if args.delete {
-        println!(
-            "Deleting all symlinks specified by files in '{}'.",
-            args.path.display()
-        );
-        for link in links {
-            link.delete()?;
-        }
-    } else {
-        for link in links {
-            link.link(args.overwrite, args.create_dirs)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn find_links(path: &PathBuf) -> Result<Vec<Link>> {
-    let mut result = Vec::<Link>::new();
-    if path.is_file() {
-        println!("'{}' is file, adding link to list.", path.display());
-        result.push(get_link(path)?)
-    } else if path.is_dir() {
-        println!(
-            "'{}' is directory, finding links recursively.",
-            path.display()
-        );
-        let paths = read_dir(path)?;
-        for path in paths {
-            result.append(&mut find_links(&path?.path())?);
-        }
-    } else {
-        println!(
-            "Path '{}' is neither file nor directory, skipping.",
-            path.display()
-        );
-    }
-    Ok(result)
-}
-
-fn get_link(origin: &PathBuf) -> Result<Link> {
-    let reg = Regex::new(r"##!!(((~|.|..)?(/.+)+)|~)").unwrap();
-    let mut destinations = Vec::<PathBuf>::new();
-
-    debug!("Trying to open file '{}'.", origin.display());
-    let file = File::open(&origin)?;
-    for line in BufReader::new(file).lines() {
-        let line = line?;
-
-        for cap in reg.captures_iter(&line) {
-            debug!("Matched: '{}', extracted substring: {}", &cap[0], &cap[1]);
-            let matched_str = &cap[1];
-
-            // expand tilde
-            let path = if matched_str.contains("~") {
-                debug!("Found tilde, replacing.");
-                shellexpand::tilde(&matched_str).to_string()
-            } else {
-                matched_str.to_string()
-            };
-
-            let mut context = origin.parent().unwrap().to_path_buf();
-            context.push(&path);
-            debug!("Expanded path: {}", context.display());
-
-            /* canonicalize() fails when the path doesn't exist.
-             * https://github.com/vitiral/path_abs provides PathAbs which creates an absolute path without failing
-             * when the path doesn't exist. This however uses an old version of serde(1.0.118) and compilation of the
-             * crate fails(seems related to https://github.com/teloxide/teloxide/issues/328).
-             * TODO open an issue/pr?
-             */
-            match context.canonicalize() {
-                Ok(mut destination) => {
-                    destination.push(&origin.file_name().unwrap());
-                    debug!("Origin: {}", &origin.display());
-                    debug!("Destination: {}", destination.display());
-                    destinations.push(destination);
-                }
-                Err(err) => println!("Path '{}' is not valid: {}", path, err),
+        if self.delete {
+            self.log(
+                format!("Deleting all symlinks from {}", self.path.display()),
+                1,
+            );
+            for link in links {
+                link.delete()?;
+            }
+        } else {
+            self.log(
+                format!("Symlinking all files in {}", self.path.display()),
+                1,
+            );
+            for link in links {
+                link.link(self.overwrite, self.create_dirs)?;
             }
         }
+        Ok(())
     }
 
-    Ok(Link {
-        origin: origin.canonicalize()?,
-        destinations,
-    })
+    // LINKS
+
+    /// Find all links recursively in a given folder or in a file.
+    fn find_links(&self, path: &PathBuf) -> Result<Vec<Link>> {
+        let mut links = Vec::<Link>::new();
+        if path.is_file() {
+            self.log(format!("Getting links from {}", path.display()), 1);
+            links.push(self.get_link(path)?)
+        } else if path.is_dir() {
+            self.log(format!("Checking directory {}", path.display()), 1);
+            let paths = read_dir(path)?;
+            for path in paths {
+                links.append(&mut self.find_links(&path?.path())?);
+            }
+        } else {
+            self.log(format!("Skipping {}", path.display()), 1);
+        }
+        Ok(links)
+    }
+
+    /// Get all links from a file.
+    fn get_link(&self, origin: &PathBuf) -> Result<Link> {
+        let reg = Regex::new(r"##!!(((~|.|..)?(/.+)+)|~)").unwrap();
+        let mut destinations = Vec::<PathBuf>::new();
+
+        self.verbose(format!("Trying to open file {}", origin.display()), 3);
+        let file = File::open(&origin)?;
+        for line in BufReader::new(file).lines() {
+            let line = line?;
+
+            for cap in reg.captures_iter(&line) {
+                self.verbose(
+                    format!("Matched: '{}', extracted substring: {}", &cap[0], &cap[1]),
+                    3,
+                );
+                let matched = &cap[1];
+
+                // handle tilde
+                let path = if matched.contains("~") {
+                    self.verbose(format!("Found tilde, replacing"), 3);
+                    shellexpand::tilde(&matched).to_string()
+                } else {
+                    matched.to_string()
+                };
+
+                let mut context = origin.parent().unwrap().to_path_buf();
+                context.push(&path);
+                self.verbose(format!("Expanded path: {}", context.display()), 3);
+
+                // absolutize "does not care about whether the file exists and what the file really is",
+                // meaning it also returns the absolute path if it does not acutally exists
+                // more here: https://crates.io/crates/path-absolutize
+                match context.absolutize() {
+                    Ok(dest_cow) => {
+                        let mut destination = dest_cow.into_owned();
+                        destination.push(&origin.file_name().unwrap());
+                        self.verbose(format!("Origin: {}", origin.display()), 3);
+                        self.verbose(format!("Destination: {}", destination.display()), 3);
+                        destinations.push(destination);
+                    }
+                    Err(err) => self.log(format!("Path {} is not valid: {}", path, err), 3),
+                }
+            }
+        }
+
+        Ok(Link {
+            origin: origin.canonicalize()?,
+            destinations,
+        })
+    }
+
+    // LOGGING (Printing nicely to console)
+
+    /// Creates a simple spacer consisting of = surrounded by empty lines.
+    fn spacer() {
+        println!();
+        println!("==========================");
+        println!();
+    }
+
+    /// Log a message with a given indentation-level.
+    fn log(&self, message: String, level: usize) {
+        let mut prefix = "".to_owned();
+        for _i in 0..level {
+            prefix += "=";
+        }
+        prefix += ">";
+
+        println!("{}", format!("{} {}", prefix, message));
+    }
+
+    /// Only log a message when verbose is specifed.
+    fn verbose(&self, message: String, level: usize) {
+        if self.verbose {
+            self.log(message, level);
+        }
+    }
+}
+
+// TODO make the log-messages more readable -> use emty lines, etc.
+// -> TODO use custom log-fn to remove timestamps
+// TODO go through this and improve stuff
+// TODO update readme
+// TODO create rpm-build and maybe publish to cargo?
+// TODO update better tests
+
+fn main() -> Result<()> {
+    // use human_panic to have a nicer error-message
+    setup_panic!();
+
+    // leverages StructOpt to do the CLI-handling and parsing
+    let autolink: Autolink = Autolink::from_args();
+    autolink.do_op()
 }
