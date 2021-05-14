@@ -5,13 +5,13 @@ use std::path::PathBuf;
 
 use crate::Autolink;
 
-pub struct Link<'a> {
+pub struct LinkFile<'a> {
     pub origin: PathBuf,
     pub destinations: Vec<PathBuf>,
     pub(crate) autolink: &'a Autolink,
 }
 
-impl<'a> Link<'a> {
+impl<'a> LinkFile<'a> {
     /// Delete the link.
     pub fn delete(&self) -> Result<()> {
         for destination in &self.destinations {
