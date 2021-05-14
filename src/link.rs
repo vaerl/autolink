@@ -19,6 +19,9 @@ impl<'a> Link<'a> {
                 self.autolink
                     .log(format!("Removing link {}", destination.display()), 1);
                 fs::remove_file(destination)?;
+            } else {
+                self.autolink
+                    .verbose(format!("No link at {}", destination.display()), 1);
             }
         }
         Ok(())

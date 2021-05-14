@@ -23,7 +23,6 @@ struct Autolink {
     #[structopt(short = "c", long = "create")]
     create_dirs: bool,
 
-    // CHECK if this flag provides value
     /// Delete existing symlinks and add again, effectively overwriting existing links
     #[structopt(short, long)]
     overwrite: bool,
@@ -45,7 +44,7 @@ impl Autolink {
 
         if self.delete {
             self.log(
-                format!("Deleting all symlinks from {}", self.path.display()),
+                format!("Removing all symlinks from {}", self.path.display()),
                 1,
             );
             for link in links {
@@ -163,12 +162,9 @@ impl Autolink {
     }
 }
 
-// TODO make the log-messages more readable -> use emty lines, etc.
-// -> TODO use custom log-fn to remove timestamps
-// TODO go through this and improve stuff
 // TODO update readme
 // TODO create rpm-build and maybe publish to cargo?
-// TODO update better tests
+// TODO write tests
 
 fn main() -> Result<()> {
     // use human_panic to have a nicer error-message
