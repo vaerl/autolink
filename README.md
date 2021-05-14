@@ -1,21 +1,19 @@
 # autolink
 
-autolink is a cli-tool for automatically symlinking files.
-
-Instead of manually symlinking files, autolink looks for lines containing `##!!`.
-Autolink will then try to read the following characters as a path and attempt to symlink the file to the destination.
+autolink is a CLI-tool for automatically symlinking files: 
+it looks for lines containing `##!!` and then tries to read the following characters as a path and to symlinks the file to the specified destination.
 
 For example, when parsing `##!!~/dev/test/` in a file called `foo.txt`, the file will be symlinked to `~/dev/test/foo.txt`.
 
 ## Features
 
-1. symlink a file or directory: `autolink <path>`
-2. delete symlinks specified a file or directory: `autolink <path to origin> -d`
+1. create symlinks specifed in a file or directory: `autolink <path>`
+    - this will fail if needed directories are not present
+2. create symlinks and needed directories: `autolink -c <path>`
+3. delete symlinks specified in a file or directory: `autolink -d <path>`
+4. overwrite symlinks: `autolink -o <path>`
 
-## Planned Features
-
-1. symlink a file or directory and create needed dirs: `autolink <path> -c`
-2. overwrite symlinks: `autolink <path> -o`
+To see verbose output, use `autolink -v <path>`.
 
 ## Testing
 
