@@ -131,6 +131,7 @@ impl Autolink {
         Ok(Link {
             origin: origin.canonicalize()?,
             destinations,
+            autolink: self,
         })
     }
 
