@@ -1,6 +1,6 @@
 use anyhow::Result;
 use human_panic::setup_panic;
-use link::Link;
+use linkfile::LinkFile;
 use path_absolutize::Absolutize;
 use regex::Regex;
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ use std::{fs::read_dir, fs::File};
 use std::{io::BufRead, io::BufReader};
 use structopt::StructOpt;
 
-mod link;
+mod linkfile;
 mod tests;
 
 // using structopt auto-generates CLI-information
@@ -65,11 +65,11 @@ impl Autolink {
     // LINKS
 
     /// Find all links recursively in a given folder or in a file.
-    fn find_links(&self, path: &PathBuf) -> Result<Vec<Link>> {
-        let mut links = Vec::<Link>::new();
+    fn find_links(&self, path: &PathBuf) -> Result<Vec<LinkFile>> {
+        let mut links = Vec::<LinkFile>::new();
         if path.is_file() {
             self.log(format!("Getting links from {}", path.display()), 1);
-            links.push(self.get_link(path)?)
+            links.push(self.get_links(path)?)
         } else if path.is_dir() {
             self.log(format!("Checking directory {}", path.display()), 1);
             let paths = read_dir(path)?;
@@ -83,7 +83,7 @@ impl Autolink {
     }
 
     /// Get all links from a file.
-    fn get_link(&self, origin: &PathBuf) -> Result<Link> {
+    fn get_links(&self, origin: &PathBuf) -> Result<LinkFile> {
         let reg = Regex::new(r"##!!(((~|.|..)?(/.+)+)|~)").unwrap();
         let mut destinations = Vec::<PathBuf>::new();
 
@@ -127,7 +127,7 @@ impl Autolink {
             }
         }
 
-        Ok(Link {
+        Ok(LinkFile {
             origin: origin.canonicalize()?,
             destinations,
             autolink: self,
