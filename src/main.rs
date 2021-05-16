@@ -162,10 +162,6 @@ impl Autolink {
     }
 }
 
-// TODO update readme
-// TODO create rpm-build and maybe publish to cargo?
-// TODO write tests
-
 fn main() -> Result<()> {
     // use human_panic to have a nicer error-message
     setup_panic!();

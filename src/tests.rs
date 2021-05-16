@@ -1,6 +1,3 @@
-// TODO write
-// TODO include origin: (), destinations: (), autolink: () origin: (), destinations: (), autolink: () during build
-
 #[cfg(test)]
 mod tests {
 
