@@ -31,7 +31,7 @@ jobs:
         with:
           toolchain: stable
       # NOTE this runs all tests and builds the application
-        run: cargo build --release --all-features
+      - run: cargo build --release --all-features
       - name: Rename binary
         run: mv target/release/autolink /target/release/autolink-amd64
       - name: Release binary
