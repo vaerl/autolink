@@ -4,7 +4,7 @@ mod tests {
     use path_absolutize::Absolutize;
 
     use crate::{linkfile::LinkFile, Autolink};
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     // FINDING LINKS
 
@@ -34,7 +34,23 @@ mod tests {
     }
 
     #[test]
-    fn get_linkfiles_from() {
+    fn get_linkfiles_from_directory() {
+        for res in PathBuf::from("examples/nested-dir").read_dir().unwrap() {
+            let dir_entry = res.unwrap();
+
+            if dir_entry.file_name().to_str().unwrap() != "file2.example" {
+                fs::remove_file(dir_entry.path()).unwrap();
+            }
+        }
+
+        assert_eq!(
+            PathBuf::from("examples/nested-dir")
+                .read_dir()
+                .unwrap()
+                .count(),
+            1
+        );
+
         let autolink = Autolink {
             path: PathBuf::from("examples/nested-dir"),
             create_dirs: false,
